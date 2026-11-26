@@ -1,36 +1,49 @@
 let img;               
-let cellSize = 6;      // Etwas grösseres Raster, entlastet den Computer noch mehr
+let cellSize = 5;      
 let brushRadius = 30;  
 let cells = [];        
 let ready = false;     
 
-// Daten Gornergletscher
-let START_YEAR = 1928;  
-let END_YEAR = 2026;    
-let START_VOLUME = 6.8; 
-let END_VOLUME = 2.9;   
+// Breite des Gletscher-Bereichs getrennt von der Gesamtbreite des Canvas
+let imgWidth = 800;
 
-let gletscherWidth = 750; // Bereich für das Bild links
+// Deine CSV-Daten direkt im Code als Tabelle gespeichert
+let dataPoints = [
+  { jahr: 1928, volumen: 6.8, prozent: 100 },
+  { jahr: 1940, volumen: 6.2, prozent: 91 },
+  { jahr: 1950, volumen: 5.7, prozent: 84 },
+  { jahr: 1960, volumen: 5.2, prozent: 76 },
+  { jahr: 1970, volumen: 4.7, prozent: 69 },
+  { jahr: 1980, volumen: 4.2, prozent: 62 },
+  { jahr: 1990, volumen: 3.7, prozent: 54 },
+  { jahr: 2000, volumen: 3.3, prozent: 49 },
+  { jahr: 2010, volumen: 3.0, prozent: 44 },
+  { jahr: 2026, volumen: 2.9, prozent: 43 }
+];
 
-function setup() {
-  createCanvas(1100, 1000);                         
+let START_YEAR, END_YEAR, START_VOLUME, END_VOLUME;
+
+async function setup() {
+  // Canvas verbreitert (800px für das Bild + 320px Seitenleiste rechts)
+  createCanvas(1120, 1000);                         
   noStroke();                                      
-  loadImage("CornergratGletscher.png", bildGeladen); 
-}
 
-function bildGeladen(geladenesBild) {
-  img = geladenesBild;          
-  img.resize(gletscherWidth, height);    
+  img = await loadImage("CornergratGletscher.png");
+
+  START_YEAR = dataPoints[0].jahr;
+  END_YEAR = dataPoints[dataPoints.length - 1].jahr;
+  START_VOLUME = dataPoints[0].volumen;
+  END_VOLUME = dataPoints[dataPoints.length - 1].volumen;
+
+  // Bild nur auf die linke Fläche (800x1000) skalieren
+  img.resize(imgWidth, height);    
   img.loadPixels();             
 
-  // Einfache doppelte Schleife für das Raster
-  for (let x = 0; x < gletscherWidth; x += cellSize) {       
+  for (let x = 0; x < imgWidth; x += cellSize) {       
     for (let y = 0; y < height; y += cellSize) {    
       let farbe = img.get(x, y);                    
       let hell = brightness(farbe);                 
-      
       if (hell > 40) {                              
-        // Speichert jeden Punkt als einfachen Daten-Eintrag (Objekt)
         cells.push({                                
           x: x,                                     
           y: y,                                     
@@ -45,137 +58,138 @@ function bildGeladen(geladenesBild) {
 }
 
 function draw() {
-  background(20);  // Einfacher dunkler Hintergrund
+  // Tiefes Gletscher-Nachtblau als Hintergrund statt reinem Schwarz
+  background(8, 18, 28);  
 
   if (!ready) {                    
     fill(255);                     
-    textSize(20);
-    text("Bild lädt...", 20, 40);  
+    text("Lädt Bild...", 20, 20);  
     return;                        
   }
 
-  // 1. Zählen, wie viele Kreise noch da sind
   let alive = 0;                   
-  for (let i = 0; i < cells.length; i++) {           
-    if (cells[i].alive == true) {
-      alive = alive + 1;          
-    }
+  for (let c of cells) {           
+    if (c.alive) alive++;          
   }
-  
   let rest = alive / cells.length; 
   let restHeute = END_VOLUME / START_VOLUME; 
 
-  // 2. Wischen mit der Maus
-  if (mouseIsPressed && rest > restHeute && mouseX < gletscherWidth) {
-    for (let i = 0; i < cells.length; i++) {
-      let d = dist(mouseX, mouseY, cells[i].x, cells[i].y);
-      if (cells[i].alive && d < brushRadius) { 
-        cells[i].alive = false;                                  
+  if (mouseIsPressed && rest > restHeute) {
+    for (let c of cells) {
+      if (c.alive && dist(mouseX, mouseY, c.x, c.y) < brushRadius) { 
+        c.alive = false;                                  
       }
     }
   }
 
-  // 3. Alle noch vorhandenen Kreise zeichnen
-  for (let i = 0; i < cells.length; i++) {
-    if (cells[i].alive == true) {
-      fill(cells[i].farbe);                 
-      circle(cells[i].x, cells[i].y, cells[i].size);      
+  for (let c of cells) {
+    if (c.alive) {
+      fill(c.farbe);                 
+      circle(c.x, c.y, c.size);      
     }
   }
 
-  // 4. Sonne an der Mausposition zeichnen (nur im linken Bereich)
-  if (mouseX < gletscherWidth) {
-    noCursor();                          
-    stroke(255, 200, 0);                 
-    strokeWeight(3);                     
-    
-    // 12 Sonnenstrahlen mit einfacher Schleife
-    for (let i = 0; i < 12; i++) {       
-      let winkel = TWO_PI / 12 * i;      
-      let x1 = mouseX + cos(winkel) * 25;  
-      let y1 = mouseY + sin(winkel) * 25;
-      let x2 = mouseX + cos(winkel) * 40;  
-      let y2 = mouseY + sin(winkel) * 40;
-      line(x1, y1, x2, y2);              
-    }
-    noStroke();                          
+  // Datenanzeige oben links (über dem linken Rand des Gletschers)
+  let aktuellesVolumen = map(rest, 1, restHeute, START_VOLUME, END_VOLUME, true);   
+  let aktuelleDaten = getInterpolatedData(aktuellesVolumen);
 
-    // Sonnenkern
-    fill(255, 220, 0);                   
-    circle(mouseX, mouseY, 40);          
-  } else {
-    cursor(); // Normaler Mauszeiger über der Infotafel rechts
-  }
-
-  // 5. Jahr und Volumen berechnen
-  let jahr = round(map(rest, 1, restHeute, START_YEAR, END_YEAR, true));   
-  let volumen = map(rest, 1, restHeute, START_VOLUME, END_VOLUME, true);   
-  let prozent = round(volumen / START_VOLUME * 100);                       
-
-  // 6. Infobox oben links (Gletscher-Daten)
-  fill(0, 150);                    
+  fill(10, 25, 40, 200);                    
   rect(20, 20, 260, 100, 8);       
-  
-  fill(255);                       
+  fill(235, 248, 255);                       
   textSize(32);                    
-  text(jahr, 35, 60);              
-  
+  text(aktuelleDaten.jahr, 35, 60);              
   textSize(15);                    
-  text("Gletschervolumen: " + nf(volumen, 1, 2) + " km³", 35, 85); 
-  text("Restbestand: " + prozent + " %", 35, 105);                 
+  text("Gletschervolumen: " + nf(aktuelleDaten.volumen, 1, 2) + " km³", 35, 85); 
+  text("Restbestand: " + aktuelleDaten.prozent + " %", 35, 105);
 
-  // 7. Rechte Hinweistafel (ganz klassisch mit einzelnen text()-Zeilen geschrieben)
-  fill(180, 215, 255, 40); // Leicht bläuliches Glas
-  stroke(255, 100);
-  strokeWeight(1);
-  rect(780, 20, 300, 960, 10); // Rechteck rechts
-  noStroke();
+  // Konstante Hinweistafel rechts (ohne Bildüberlappung)
+  drawInfoPanel();
 
-  // Titel rechts
-  fill(255);
-  textSize(22);
-  text("Gorner Gletscher", 810, 70);
+  // Sonne als Cursor (wird zuletzt gezeichnet, damit sie über allem liegt)
+  noCursor();                          
+  stroke(255, 200, 0);                 
+  strokeWeight(3);                     
+  for (let i = 0; i < 12; i++) {       
+    let winkel = TWO_PI / 12 * i;      
+    let x1 = mouseX + cos(winkel) * 25;  
+    let y1 = mouseY + sin(winkel) * 25;
+    let x2 = mouseX + cos(winkel) * 40;  
+    let y2 = mouseY + sin(winkel) * 40;
+    line(x1, y1, x2, y2);              
+  }
+  noStroke();                          
 
-  // Trennlinie
-  stroke(255, 100);
-  line(810, 90, 1050, 90);
-  noStroke();
-
-  // Beschreibung (Zeile für Zeile geschrieben, typisch für Anfänger)
-  fill(230, 240, 255);
-  textSize(13);
-  
-  text("Der Gletscherschwund ist ein direktes", 810, 130);
-  text("Resultat des globalen Klimawandels", 810, 150);
-  text("und der steigenden Temperaturen.", 810, 170);
-
-  text("Dieses interaktive Modell zeigt den/n Rückgang des Gornergletschers/n am Monte Rosa im Wallis/n zwischen 1928 und 2026.", 810, 220);
-  //text("Rückgang des Gornergletschers", 810, 240);
-  //text("am Monte Rosa im Wallis", 810, 260);
-  //text("zwischen 1928 und 2026.", 810, 280);
-
-  // Bedienungsanleitung rechts
-  fill(255, 210, 100);
-  textSize(15);
-  text("Bedienung:", 810, 360);
-
-  fill(230, 240, 255);
-  textSize(13);
-  text("1. Bewege die Sonne über den", 810, 400);
-  text("   Gletscher zum Schmelzen.", 810, 420);
-  
-  text("2. Das Modell stoppt im", 810, 460);
-  text("   Jahr 2026.", 810, 480);
-
-  text("3. Drücke 'R' auf der Tastatur,", 810, 520);
-  text("   um neu zu starten.", 810, 540);
+  fill(255, 220, 0);                   
+  circle(mouseX, mouseY, 40);          
 }
 
-// Taste R: Alles zurücksetzen
+function drawInfoPanel() {
+  let panelX = 820;
+  let panelY = 20;
+  let panelW = 280;
+  let panelH = 330;
+
+  push();
+  // Gläserner Gletscher-Effekt: Eisblau-türkise Fläche mit Transparenz & feinem Eis-Rahmen
+  fill(140, 210, 235, 38);
+  stroke(185, 235, 255, 130);
+  strokeWeight(1.5);
+  rect(panelX, panelY, panelW, panelH, 16);
+
+  // Dezenter Lichtglanz am oberen Rand für den Glas-Look
+  noStroke();
+  fill(255, 255, 255, 25);
+  rect(panelX + 2, panelY + 2, panelW - 4, 35, 14, 14, 0, 0);
+
+  // Titel
+  fill(225, 248, 255);
+  textStyle(BOLD);
+  textSize(22);
+  text("Gorner Gletscher", panelX + 22, panelY + 46);
+
+  // Feine Trennlinie in Eisblau
+  stroke(160, 225, 250, 90);
+  strokeWeight(1);
+  line(panelX + 22, panelY + 62, panelX + panelW - 22, panelY + 62);
+
+  // Fließtext (exakt wie gewünscht)
+  noStroke();
+  textStyle(NORMAL);
+  fill(210, 238, 250);
+  textSize(15);
+  textLeading(22);
+
+  let text1 = "Der Gletscherschwund ist ein direktes Resultat des globalen Klimawandels und der steigenden Temperaturen.";
+  let text2 = "Dieses interaktive Modell zeigt den Rückgang des Gornergletschers am Monte Rosa im Wallis zwischen 1928 und 2026.";
+
+  text(text1, panelX + 22, panelY + 84, panelW - 44, 120);
+  text(text2, panelX + 22, panelY + 195, panelW - 44, 130);
+  pop();
+}
+
+function getInterpolatedData(vol) {
+  if (vol >= dataPoints[0].volumen) {
+    return { jahr: dataPoints[0].jahr, volumen: dataPoints[0].volumen, prozent: dataPoints[0].prozent };
+  }
+  let last = dataPoints[dataPoints.length - 1];
+  if (vol <= last.volumen) {
+    return { jahr: last.jahr, volumen: last.volumen, prozent: last.prozent };
+  }
+
+  for (let i = 0; i < dataPoints.length - 1; i++) {
+    let p1 = dataPoints[i];
+    let p2 = dataPoints[i + 1];
+    if (vol <= p1.volumen && vol >= p2.volumen) {
+      let jahr = map(vol, p1.volumen, p2.volumen, p1.jahr, p2.jahr);
+      let prozent = map(vol, p1.volumen, p2.volumen, p1.prozent, p2.prozent);
+      return { jahr: round(jahr), volumen: vol, prozent: round(prozent) };
+    }
+  }
+  return { jahr: END_YEAR, volumen: END_VOLUME, prozent: dataPoints[dataPoints.length - 1].prozent };
+}
+
 function keyPressed() {
   if (key === "r" || key === "R") {     
-    for (let i = 0; i < cells.length; i++) {
-      cells[i].alive = true; 
-    }
+    for (let c of cells) c.alive = true; 
   }
 }
