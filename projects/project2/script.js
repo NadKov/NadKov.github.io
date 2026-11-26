@@ -7,20 +7,7 @@ let ready = false;
 // Breite des Gletscher-Bereichs getrennt von der Gesamtbreite des Canvas
 let imgWidth = 800;
 
-// Deine CSV-Daten direkt im Code als Tabelle gespeichert
-let dataPoints = [
-  { jahr: 1928, volumen: 6.8, prozent: 100 },
-  { jahr: 1940, volumen: 6.2, prozent: 91 },
-  { jahr: 1950, volumen: 5.7, prozent: 84 },
-  { jahr: 1960, volumen: 5.2, prozent: 76 },
-  { jahr: 1970, volumen: 4.7, prozent: 69 },
-  { jahr: 1980, volumen: 4.2, prozent: 62 },
-  { jahr: 1990, volumen: 3.7, prozent: 54 },
-  { jahr: 2000, volumen: 3.3, prozent: 49 },
-  { jahr: 2010, volumen: 3.0, prozent: 44 },
-  { jahr: 2026, volumen: 2.9, prozent: 43 }
-];
-
+let dataPoints = [];
 let START_YEAR, END_YEAR, START_VOLUME, END_VOLUME;
 
 async function setup() {
@@ -28,7 +15,21 @@ async function setup() {
   createCanvas(1120, 1000);                         
   noStroke();                                      
 
+  // Bild und CSV-Zeilen asynchron laden
   img = await loadImage("CornergratGletscher.png");
+  let lines = await loadStrings("gletscher_daten.csv");
+
+  // CSV zeilenweise einlesen (ab Zeile 1, da Zeile 0 die Überschrift ist)
+  for (let i = 1; i < lines.length; i++) {
+    let line = lines[i].trim();
+    if (line.length === 0) continue; // Leere Zeilen überspringen
+    let parts = line.split(",");
+    dataPoints.push({
+      jahr: int(parts[0]),
+      volumen: float(parts[1]),
+      prozent: int(parts[2])
+    });
+  }
 
   START_YEAR = dataPoints[0].jahr;
   END_YEAR = dataPoints[dataPoints.length - 1].jahr;
@@ -63,7 +64,7 @@ function draw() {
 
   if (!ready) {                    
     fill(255);                     
-    text("Lädt Bild...", 20, 20);  
+    text("Lädt Daten & Bild...", 20, 20);  
     return;                        
   }
 
@@ -152,7 +153,7 @@ function drawInfoPanel() {
   strokeWeight(1);
   line(panelX + 22, panelY + 62, panelX + panelW - 22, panelY + 62);
 
-  // Fließtext (exakt wie gewünscht)
+  // Fließtext
   noStroke();
   textStyle(NORMAL);
   fill(210, 238, 250);
