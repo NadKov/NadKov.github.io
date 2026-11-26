@@ -1,56 +1,100 @@
-let buffer;
-let brightness2D = []; // brightness2D[x][y] is how bright the word is at one pixel of the buffer
+let t = 0;
+let morph = 3;        // Steuert den Übergang (0 = Chaos/Noise, 1 = Wort)
+let isWord = false;   // Status, ob gerade das Wort gezeigt wird
+let targets = [];     // Speichert die Ziel-Koordinaten des Wortes
+let word = "INTERACTION DESIGN";    // <-- HIER DEIN WUNSCHWORT EINTRAGEN
+let extraCanvas;
 
-async function setup() {
-    createCanvas(windowWidth, windowHeight);
+function setup() {
+  createCanvas(innerWidth, innerHeight);
+  strokeWeight(4);
+  calculateWordTargets();
+}
 
-    // a small invisible canvas: the word is drawn on it once, and only used as data
-    buffer = createGraphics(120, 60);
-    buffer.background(0);
-    buffer.fill(255);
-    buffer.textStyle(BOLD);
-    buffer.textAlign(CENTER, CENTER);
-    buffer.textSize(40);
-    buffer.text("Type", buffer.width / 2, buffer.height / 2);
+// Liest die Pixel-Positionen der Buchstaben aus
+function calculateWordTargets() {
+  targets = [];
+  let pg = createGraphics(width, height);
+  pg.pixelDensity(1);
+  pg.background(0);
+  pg.fill(random(255));
+  pg.textAlign(CENTER, CENTER);
+  
+  // Schriftgröße automatisch an die Bildschirmbreite anpassen
+  let fontSize = min(width / (word.length * 0.7), 260);
+  pg.textSize(fontSize);
+  pg.textStyle(BOLD);
+  pg.text(word, width / 2, height / 2);
+  pg.loadPixels();
 
-    // blur the word, so the edges of the letters become soft slopes instead of hard steps
-    // filter() is asynchronous in p5.js 2.x, so await it before reading pixels
-    await buffer.filter(BLUR, 1.2);
-
-    // read the brightness of every pixel once: [0] is the red channel, 0 for black and 255 for white
-    for (let x = 0; x < buffer.width; x++) {
-        brightness2D[x] = [];
-        for (let y = 0; y < buffer.height; y++) {
-            brightness2D[x][y] = buffer.get(x, y)[0];
-        }
+  // Raster im gleichen Abstand (8px) wie das Noise-Gitter abtasten
+  for (let x = 0; x < width; x += 8) {
+    for (let y = 0; y < height; y += 8) {
+      let index = (x + y * width) * 4;
+      // Wenn der Pixel weiß ist (Teil des Textes), als Ziel speichern
+      if (pg.pixels[index] > 128) {
+        targets.push(createVector(x, y));
+      }
     }
+  }
 }
 
 function draw() {
-    background(0);
-    stroke(255);
-    strokeWeight(2);
-    noFill();
+  background(0);
 
-    let stepX = width / buffer.width;   // distance between two points of a line
-    let stepY = height / buffer.height; // distance between two lines
 
-    // mouseX sets how high the word is pushed up, mouseY sets how strongly the lines wobble
-    let amount = map(mouseX, 0, width, 0, 40);
-    let wobble = map(mouseY, 0, height, 0, 20);
+  // Sanfter Übergang zwischen 0 (Noise) und 1 (Wort)
+  let targetMorph = isWord ? 1 : 0;
+  morph = lerp(morph, targetMorph, 0.06); // 0.06 bestimmt die Geschwindigkeit des Zusammenziehens
 
-    // one line for every row of the buffer
-    for (let y = 0; y < buffer.height; y++) {
-        beginShape();
-        for (let x = 0; x < buffer.width; x++) {
-            // bright pixels (the letters) push the line upward
-            let lift = brightness2D[x][y] / 255 * amount;
+  let pointIndex = 0;
 
-            // smaller steps in noise() make the wobble slower and smoother
-            lift += noise(x * 0.05, y * 0.05, frameCount * 0.01) * wobble;
+  for (let x = 0; x < width; x += 8) {
+    for (let y = 0; y < height; y += 8) {
+      let n = noise(x * 0.004, y * 0.004 - t);
+      let m = noise(x * 0.01 + 9, y * 0.01 - 9 - t * 2);
+      let a = TAU * (n * 3 + m);
 
-            vertex(x * stepX, y * stepY - lift);
-        }
-        endShape();
+      // Ursprüngliche Noise-Position
+      let noiseX = x + 100 * cos(a);
+      let noiseY = y + 100 * sin(a);
+
+      let finalX = noiseX;
+      let finalY = noiseY;
+
+      // Wenn Zielpunkte für das Wort existieren, Punkte dorthin ziehen
+      if (targets.length > 0) {
+        // Alle Gitterpunkte werden gleichmäßig auf die Buchstaben verteilt
+        let target = targets[pointIndex % targets.length];
+        
+        // Minimaler Rest-Drift (2px), damit das Wort lebendig schimmert
+        let hoverX = target.x + 2 * cos(a);
+        let hoverY = target.y + 2 * sin(a);
+
+        // Weiche Interpolation zwischen Noise-Position und Wort-Position
+        finalX = lerp(noiseX, hoverX, morph);
+        finalY = lerp(noiseY, hoverY, morph);
+      }
+
+      // Bei Wort-Formation etwas deckender leuchten lassen
+      let alpha = lerp(100, 200, morph);
+      stroke(120 + 135 * m, 100 + 35 * n, 255, alpha);
+      point(finalX, finalY);
+
+      pointIndex++;
     }
+  }
+
+  t += 0.05;
+}
+
+// Schaltet beim Mausklick zwischen Wort und Noise-Welle um
+function mousePressed() {
+  isWord = !isWord;
+}
+
+// Passt die Leinwand und Textposition an, falls das Fenster skaliert wird
+function windowResized() {
+  resizeCanvas(innerWidth, innerHeight);
+  calculateWordTargets();
 }

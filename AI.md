@@ -11,20 +11,21 @@ Be honest and specific.
 
 ### Which tools did you use?
 
-<!-- e.g. ChatGPT, Claude, GitHub Copilot, Midjourney, an image/sound generator, … -->
-
+Gemini von Google, p5js (als Vorlagen)
 -
 
 ### What did you use them for?
 
-<!-- Where did AI help? Ideas, writing/debugging code, creating visual or audio assets, explaining a concept, refactoring, … -->
+How to combine two different codes, or for an example with Project 1: i Wanted to know how make "noise" built a word i defined with the function "mousePressed". 
 
+for Project 2: 
 -
 
 ### How did you use them?
 
-<!-- Include the key prompts you used, or a short summary of the back-and-forth. Be specific enough that someone could follow your process. -->
+First i searched for different ideas for the Projects. Some of the codes on p5js were in Chinese, or other languages described. Because i wanted to understand new parts in a code, like "noise" or "morph". 
 
+I also learned what "extraCanvas" means and how that could help in afuture.
 -
 
 ### What was your own contribution?
